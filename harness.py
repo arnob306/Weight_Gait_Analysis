@@ -43,3 +43,24 @@ def classify_clip(client, video_path, prompt, model="gemini-3.5-flash"):
         "success": success,
         "error": error,
     }
+
+
+def classify_frames_local(generate_fn, frames, prompt):
+    """
+    Runs any local vision-language model over a list of sampled frames and
+    returns the same structured result shape as classify_clip.
+
+    generate_fn(frames, prompt) -> raw response text. The caller supplies it,
+    so this module has no dependency on any particular model library -- an
+    open-weights model such as Qwen3-VL-4B running in a Kaggle notebook and
+    the Gemini API both produce results comparable by the same harness.
+    """
+    raw_text = generate_fn(frames, prompt)
+    parsed, success, error = parse_model_response(raw_text)
+    return {
+        "video_path": None,
+        "raw_response": raw_text,
+        "parsed": parsed,
+        "success": success,
+        "error": error,
+    }
