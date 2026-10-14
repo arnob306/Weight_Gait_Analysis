@@ -33,6 +33,14 @@ def select_dev_set(labels: pd.DataFrame, n_per_class: int, seed: int) -> list[in
     Per the brief: prompt iteration happens on a held-out dev subset, never
     on the test set -- this is that subset, not a final evaluation sample.
     """
+    counts = labels["weight_class"].value_counts()
+    insufficient = counts[counts < n_per_class]
+    if not insufficient.empty:
+        raise ValueError(
+            f"n_per_class={n_per_class} exceeds available clips for weight_class(es) "
+            f"{insufficient.index.tolist()} (have {insufficient.tolist()})"
+        )
+
     chosen = (
         labels.reset_index()
         .groupby("weight_class", group_keys=False)

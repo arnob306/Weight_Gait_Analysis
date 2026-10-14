@@ -1,58 +1,55 @@
 import json
 import os
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 
+import cv2
 from dotenv import load_dotenv
 from google import genai
 
-from harness import classify_clip
+from experiment import NUM_SAMPLED_FRAMES, PROMPT, log_result
+from frame_sampling import extract_frames, sample_frame_indices
+from harness import classify_clip, classify_frames_gemini
 from labels import get_instance_label, load_labels, select_dev_set
 from representations import build_all_representations
+from skeleton_utils import active_frame_range, load_instance_joints
 
 load_dotenv()
 
 CSV_PATH = "All Joints/Absolute_Data.csv"
-MODEL = "gemini-3.5-flash"
+MODEL = "gemini-3.8-flash"
+# gemini-3.5-flash's free-tier daily quota (20 requests/day on this key) was
+# exhausted by this same dev-set run -- confirmed via the API's own 429
+# RESOURCE_EXHAUSTED response, not assumed. gemini-3.8-flash is Google's own
+# suggested replacement (returned in a 404 message from the now-deprecated
+# gemini-2.5-flash) and has its own separate, untouched daily quota, since
+# Google scopes this quota per model, not per API key.
 N_PER_CLASS = 2
 SEED = 42
 RENDER_DIR = "renders"
 RESULTS_DIR = Path("results/raw_responses")
 SUMMARY_PATH = Path("results/dev_set_summary.json")
-# Free tier for gemini-3.5-flash allows 5 requests/minute; space calls out to
-# stay under that instead of burning quota on retries.
+# Conservative pacing carried over from gemini-3.5-flash's free tier (5
+# requests/minute); gemini-3.8-flash's exact rate limit hasn't been confirmed,
+# so this stays as a safe default rather than a guessed faster pace.
 SECONDS_BETWEEN_CALLS = 13
 
-PROMPT = (
-    'You are shown a video of a person walking. Classify their gait into exactly '
-    'one of the following three categories: 0 = normal walking, 1 = limping '
-    '(one leg affected), 2 = shuffling (both legs affected). Respond only with '
-    'valid JSON in this exact format: {"weight_class": <0, 1, or 2>, '
-    '"reasoning": "<one sentence explaining what you observed>"}'
-)
 
+def classify_representation(client, file_path: str, model: str, start: int, end: int) -> dict:
+    """Montage is already a single fixed image, sent as-is. The three video
+    representations are sampled to NUM_SAMPLED_FRAMES within [start, end] --
+    the range where the subject is actually in frame -- so Gemini sees the
+    same frame budget as the Kaggle/Qwen backend, not the whole clip (most of
+    which can be empty before/after the walk)."""
+    if file_path.endswith(".png"):
+        return classify_clip(client, file_path, PROMPT, model=model)
 
-def log_result(instance: int, representation: str, file_path: str, result: dict, ground_truth: dict) -> dict:
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    predicted = result["parsed"]["weight_class"] if result["success"] else None
-    record = {
-        "instance": instance,
-        "representation": representation,
-        "file_path": file_path,
-        "model": MODEL,
-        "prompt": PROMPT,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "raw_response": result["raw_response"],
-        "parsed": result["parsed"],
-        "success": result["success"],
-        "error": result["error"],
-        "ground_truth": ground_truth,
-        "correct": predicted == ground_truth["weight_class"] if predicted is not None else None,
-    }
-    out_path = RESULTS_DIR / f"instance{instance}_{representation}.json"
-    out_path.write_text(json.dumps(record, indent=2))
-    return record
+    cap = cv2.VideoCapture(file_path)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    cap.release()
+    indices = sample_frame_indices(total_frames, NUM_SAMPLED_FRAMES, start=start, end=end)
+    frames = extract_frames(file_path, indices)
+    return classify_frames_gemini(client, frames, PROMPT, model=model)
 
 
 def summarize(records: list[dict], representations: list[str]) -> dict:
@@ -78,12 +75,14 @@ def main() -> None:
     representations = []
     for instance in dev_instances:
         ground_truth = get_instance_label(labels, instance)
-        paths = build_all_representations(instance, f"{RENDER_DIR}/{instance}")
+        instance_joints = load_instance_joints(CSV_PATH, instance)
+        start, end = active_frame_range(instance_joints)
+        paths = build_all_representations(instance, f"{RENDER_DIR}/{instance}", instance_joints=instance_joints)
         representations = list(paths.keys())
 
         for representation, file_path in paths.items():
-            result = classify_clip(client, file_path, PROMPT, model=MODEL)
-            record = log_result(instance, representation, file_path, result, ground_truth)
+            result = classify_representation(client, file_path, MODEL, start, end)
+            record = log_result(RESULTS_DIR, MODEL, instance, representation, file_path, result, ground_truth)
             all_records.append(record)
 
             predicted = record["parsed"]["weight_class"] if record["success"] else None

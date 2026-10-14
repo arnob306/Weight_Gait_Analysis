@@ -36,11 +36,42 @@ def joints_from_row(row: pd.Series) -> tuple[list[tuple[int, int]], list[bool]]:
     return joints, valid
 
 
-def draw_skeleton(canvas: np.ndarray, joints: list[tuple[int, int]], valid: list[bool]) -> None:
-    """Draw skeleton edges and joint markers onto canvas in place."""
+def active_frame_range(instance_joints: pd.DataFrame) -> tuple[int, int]:
+    """Returns the (first, last) 0-indexed frame positions where the subject
+    has at least one detected joint. Many clips have the person in frame for
+    only part of the recording (walking in from off-camera, or leaving frame
+    before the clip ends) -- sampling should stay within this range."""
+    detected = [any(joints_from_row(row)[1]) for _, row in instance_joints.iterrows()]
+    positions = [i for i, ok in enumerate(detected) if ok]
+    return (positions[0], positions[-1]) if positions else (0, len(instance_joints) - 1)
+
+
+BLUE, RED, GREY = (255, 80, 0), (0, 0, 255), (170, 170, 170)  # BGR: left limbs, right limbs, head and trunk
+_LEFT_LIMB = {7, 9, 13, 15}   # left elbow, hand, knee, foot
+_RIGHT_LIMB = {8, 10, 14, 16}
+_LEFT_EDGES = {(5, 7), (7, 9), (11, 13), (13, 15)}
+_RIGHT_EDGES = {(6, 8), (8, 10), (12, 14), (14, 16)}
+
+
+def draw_skeleton(canvas: np.ndarray, joints: list[tuple[int, int]], valid: list[bool],
+                  by_side: bool = False) -> np.ndarray:
+    """Returns a new array with skeleton edges and joint markers drawn over canvas.
+
+    by_side=False is the original white-and-orange drawing. by_side=True draws the
+    walker's left arm and leg in blue, the right arm and leg in red, and the head
+    and trunk in grey (the colours the Gemma prompts describe); the shoulders and
+    hips count as trunk, so each limb's colour starts at its elbow or knee."""
+    canvas = canvas.copy()
     for a, b in SKELETON_EDGES:
         if valid[a] and valid[b]:
-            cv2.line(canvas, joints[a], joints[b], (255, 255, 255), 2)
-    for (x, y), ok in zip(joints, valid):
+            color = (255, 255, 255)
+            if by_side:
+                color = BLUE if (a, b) in _LEFT_EDGES else RED if (a, b) in _RIGHT_EDGES else GREY
+            cv2.line(canvas, joints[a], joints[b], color, 2)
+    for k, ((x, y), ok) in enumerate(zip(joints, valid)):
         if ok:
-            cv2.circle(canvas, (x, y), 4, (0, 200, 255), -1)
+            color = (0, 200, 255)
+            if by_side:
+                color = BLUE if k in _LEFT_LIMB else RED if k in _RIGHT_LIMB else GREY
+            cv2.circle(canvas, (x, y), 4, color, -1)
+    return canvas

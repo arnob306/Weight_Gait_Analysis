@@ -1,0 +1,20 @@
+*.mp4
+*.history
+*.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Office lock files (e.g. ~$Proposal.docx)
+~$*
+
+# Generated pipeline output (regenerable from All RGB Videos / All Joints)
+renders/
+
+# Images and result data -- kept out of git
+*.png
+*.jpg
+*.jpeg
+*.json

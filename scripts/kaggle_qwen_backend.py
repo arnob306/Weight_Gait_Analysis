@@ -36,11 +36,16 @@ def _load():
     return _model, _processor
 
 
-def generate_fn(frames, prompt: str) -> str:
+def generate_fn(frames, prompt: str, temperature: float | None = None, max_new_tokens: int = 512) -> str:
     """
     frames: list of BGR numpy arrays, as returned by frame_sampling.extract_frames.
     Builds a multi-image chat prompt and returns the model's raw text response,
     matching the contract harness.classify_frames_local expects.
+
+    temperature: if given, forces sampling (do_sample=True) at that temperature
+    instead of the model's default generation config -- needed for a genuine
+    self-consistency test (repeated calls on the same input should only vary
+    if sampling is actually enabled).
     """
     model, processor = _load()
     images = [Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)) for frame in frames]
@@ -54,7 +59,11 @@ def generate_fn(frames, prompt: str) -> str:
         return_dict=True, return_tensors="pt",
     ).to(model.device)
 
-    output_ids = model.generate(**inputs, max_new_tokens=512)
+    generate_kwargs = {"max_new_tokens": max_new_tokens}
+    if temperature is not None:
+        generate_kwargs.update(do_sample=True, temperature=temperature)
+
+    output_ids = model.generate(**inputs, **generate_kwargs)
     response = processor.batch_decode(
         output_ids[:, inputs["input_ids"].shape[1]:], skip_special_tokens=True,
     )[0]
