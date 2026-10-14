@@ -1,0 +1,25 @@
+Gemma-4-E4B-it, dev set (30 clips), 1 fps, window mode, greedy decoding, seed 27, max_soft_tokens 140.
+Summary table pasted by the user from run_gemma.summarize(), taken BEFORE the P3 run was resumed
+(so P3 raw_video is partial: 21 clips, all of classes 0 and 1 plus one class-2 clip).
+P0 and P1 used the original short answer format; P2 and P3 used the longer guided prompts with the integer rule.
+Columns: split|prompt|fps|mode|rep, correct/n, accuracy, p vs 1/3 chance (one-sided binomial), predicted 0/1/2/fail.
+
+split|prompt|fps|mode|rep                                        acc      p  predicted 0/1/2/fail
+dev|P0_rubric|1|window|montage                              10/30   33%  0.568  30/0/0/0
+dev|P0_rubric|1|window|overlay                              11/30   37%  0.415  29/1/0/0
+dev|P0_rubric|1|window|raw_video                            10/30   33%  0.568  30/0/0/0
+dev|P0_rubric|1|window|skeleton                             10/30   33%  0.568  30/0/0/0
+dev|P1_reasoning_first|1|window|montage                     10/30   33%  0.568  30/0/0/0
+dev|P1_reasoning_first|1|window|overlay                     10/30   33%  0.568  30/0/0/0
+dev|P1_reasoning_first|1|window|raw_video                    9/30   30%  0.714  28/0/0/2
+dev|P1_reasoning_first|1|window|skeleton                    10/30   33%  0.568  30/0/0/0
+dev|P2_guided_per_leg|1|window|montage                      13/30   43%  0.166  0/12/18/0
+dev|P2_guided_per_leg|1|window|overlay                       8/30   27%  0.833  0/20/10/0
+dev|P2_guided_per_leg|1|window|raw_video                     9/30   30%  0.714  0/13/17/0
+dev|P2_guided_per_leg|1|window|skeleton                     11/30   37%  0.415  4/16/10/0
+dev|P3_guided_balanced|1|window|raw_video                   12/21   57%  0.021  8/13/0/0
+
+Note: the P3 raw_video row is NOT comparable with the others. Its 21 clips contain no class-2 clips that the model
+could get right (it never answered 2), so the fair chance level there is about 50%, not 33%.
+Blind controls (no image) were run once per prompt: P0, P1 and P2 have one each. P3 blind was run in the resume.
+Clip 582 (21 images at 1 fps) ran out of GPU memory under P3, so it is excluded from P3 (29 clips).
