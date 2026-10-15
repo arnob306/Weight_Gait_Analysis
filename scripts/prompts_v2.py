@@ -4,11 +4,12 @@ exactly one block. The review text is docs/gemma_prompts_v2_draft.md.
 
   Z_zero_shot   A + B + C + F
   R_rubric      A + B + C + D + F
-  S_few_shot    A + B + C + D + E + F   (examples not chosen yet; build_prompt raises)
+  S_few_shot    A + B + C + D + E + F   (E: the examples themselves are sent first, see fewshot_examples)
 
 A task and class definition, B what the images show (the only block that changes
 between the four inputs), C timing and viewpoint (only numbers change), D rubric,
-E worked examples, F output format. P0 to P3 in prompts.py stay as development
+E worked examples (the pointer sentence here, the examples sent as images and
+answers before the frames), F output format. P0 to P3 in prompts.py stay as development
 history.
 
 Assumption behind the timing sentence: the stored clips keep every recorded frame,
@@ -116,6 +117,12 @@ BLOCK_D = (
     "'unclear' is better than a guess."
 )
 
+BLOCK_E = (
+    "WORKED EXAMPLES\n"
+    "The worked examples shown before the frames use this same answer format. They are other "
+    "people. Judge the new video only from its own frames, and do not copy an example's answer."
+)
+
 
 def _enum(values) -> str:
     return " | ".join(f'"{v}"' for v in values)
@@ -220,12 +227,12 @@ def build_prompt(variant: str, rep: str, indices: list[int], direction: str | No
     if variant not in VARIANTS:
         raise ValueError(f"unknown prompt variant {variant!r}")
     blocks = VARIANTS[variant]
-    if "E" in blocks:
-        raise NotImplementedError("few-shot examples have not been chosen yet")
     fill = _fill(rep, indices, direction, near_leg)
     parts = [BLOCK_A.format(**fill), _view(rep, indices, direction, near_leg)]
     if "D" in blocks:
         parts.append(BLOCK_D)
+    if "E" in blocks:
+        parts.append(BLOCK_E)
     parts.append(BLOCK_F)
     return "\n\n".join(parts)
 

@@ -37,7 +37,8 @@ ROOT = Path(__file__).resolve().parent.parent
 STAGE = ROOT / "kaggle_upload"
 SCRIPTS = ["frame_sampling.py", "prompts.py", "gemma_backend.py", "run_gemma.py", "samples.py",
            "harness.py", "experiment.py",  # the last two are imported by run_gemma and prompts
-           "prompts_v2.py", "gait_parse.py"]  # the v2 prompt set and its parser (imported by run_gemma)
+           "prompts_v2.py", "gait_parse.py",
+           "fewshot_examples.py"]  # prompt S: the worked-example answers; their grids are fewshot/*.png  # the v2 prompt set and its parser (imported by run_gemma)
 
 
 def stage_clip(instance: int, joints) -> None:

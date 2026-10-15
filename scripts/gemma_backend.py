@@ -59,8 +59,9 @@ def _load():
     return _model, _processor
 
 
-def _build_inputs(frames, prompt: str, labels=None):
-    """labels: optional text line sent just before each image (e.g. "Frame 3 of 5")."""
+def _build_inputs(frames, prompt: str, labels=None, examples=None):
+    """labels: optional text line sent just before each image (e.g. "Frame 3 of 5").
+    examples: optional (text, image or None) pairs sent first, in order: the worked examples."""
     model, processor = _load()
     processor.image_processor.max_soft_tokens = MAX_SOFT_TOKENS
     images = [Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)) for frame in frames]
@@ -68,6 +69,10 @@ def _build_inputs(frames, prompt: str, labels=None):
         raise ValueError(f"{len(labels)} labels for {len(images)} images")
 
     content = []
+    for text, example_image in examples or []:
+        content.append({"type": "text", "text": text})
+        if example_image is not None:
+            content.append({"type": "image", "image": Image.fromarray(cv2.cvtColor(example_image, cv2.COLOR_BGR2RGB))})
     for k, image in enumerate(images):
         if labels is not None:
             content.append({"type": "text", "text": labels[k]})
@@ -80,17 +85,17 @@ def _build_inputs(frames, prompt: str, labels=None):
     ).to(model.device)
 
 
-def count_input_tokens(frames, prompt: str, labels=None) -> int:
+def count_input_tokens(frames, prompt: str, labels=None, examples=None) -> int:
     """Length of the model input for these frames, to check what MAX_SOFT_TOKENS does."""
-    return int(_build_inputs(frames, prompt, labels)["input_ids"].shape[-1])
+    return int(_build_inputs(frames, prompt, labels, examples)["input_ids"].shape[-1])
 
 
-def generate_fn(frames, prompt: str, max_new_tokens: int = 512, labels=None) -> str:
+def generate_fn(frames, prompt: str, max_new_tokens: int = 512, labels=None, examples=None) -> str:
     """frames: list of BGR numpy arrays, as returned by frame_sampling.extract_frames.
     An empty list gives the text-only blind control. labels: optional text line before
-    each image."""
+    each image. examples: worked examples, see _build_inputs."""
     model, processor = _load()
-    inputs = _build_inputs(frames, prompt, labels)
+    inputs = _build_inputs(frames, prompt, labels, examples)
     input_len = inputs["input_ids"].shape[-1]
 
     try:

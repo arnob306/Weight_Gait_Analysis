@@ -31,7 +31,7 @@ for p in PROMPTS:
         ok = sum(r["pred"] == r["true_class"] for r in rs)
         spread = collections.Counter(r["pred"] for r in rs)
         per = {c: sum(r["pred"] == c for r in rs if r["true_class"] == c) for c in (0, 1, 2)}
-        print(f"{p:12s} {rep:10s} {ok:2d}/30 p={binom_p(ok,30):.3f} pred0/1/2={spread[0]}/{spread[1]}/{spread[2]}  correct per true class 0/1/2={per[0]}/{per[1]}/{per[2]}")
+        print(f"{p:12s} {rep:10s} {ok:2d}/{len(rs)} p={binom_p(ok,len(rs)):.3f} pred0/1/2={spread[0]}/{spread[1]}/{spread[2]}  correct per true class 0/1/2={per[0]}/{per[1]}/{per[2]}")
 
 print("\n== blind ==")
 for r in rows:
@@ -45,7 +45,7 @@ for rep in REPS:
     rr = [by[("R_rubric", rep)][i]["pred"] == by[("R_rubric", rep)][i]["true_class"] for i in ids]
     same = sum(by[("Z_zero_shot", rep)][i]["pred"] == by[("R_rubric", rep)][i]["pred"] for i in ids)
     n01, n10, p = mcnemar(z, rr)
-    print(f"{rep:10s} Z-only-right={n01} R-only-right={n10} McNemar p={p:.3f}; identical class answer on {same}/30 clips")
+    print(f"{rep:10s} Z-only-right={n01} R-only-right={n10} McNemar p={p:.3f}; identical class answer on {same}/{len(ids)} clips")
 
 print("\n== leg-level (left impaired in classes 1,2; right impaired in class 2) ==")
 for p in PROMPTS:
@@ -71,7 +71,7 @@ for p in PROMPTS:
         ob_hit = sum(r["obstacle_pred"] is True for r in ob_t)
         fz_fp = sum(r["freeze_pred"] is True for r in rs if not r["freeze_true"])
         ob_fp = sum(r["obstacle_pred"] is True for r in rs if not r["obstacle_true"])
-        print(f"{p:12s} {rep:10s} freeze found {fz_hit}/{len(fz_t)} false alarms {fz_fp}/{30-len(fz_t)} | obstacle found {ob_hit}/{len(ob_t)} false alarms {ob_fp}/{30-len(ob_t)}")
+        print(f"{p:12s} {rep:10s} freeze found {fz_hit}/{len(fz_t)} false alarms {fz_fp}/{len(rs)-len(fz_t)} | obstacle found {ob_hit}/{len(ob_t)} false alarms {ob_fp}/{len(rs)-len(ob_t)}")
 
 print("\n== consistency, confidence, 'unclear' use, invalid values ==")
 for p in PROMPTS:

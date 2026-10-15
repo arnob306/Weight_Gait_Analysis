@@ -129,9 +129,56 @@ def test_frame_labels_and_montage_numbers():
     assert "2 x 4 grid" in pv.build_prompt("Z_zero_shot", "montage", list(range(0, 56, 7)), "left", "left")
 
 
-def test_few_shot_not_available_until_examples_exist():
-    with pytest.raises(NotImplementedError):
-        pv.build_prompt("S_few_shot", "raw_video", IDX, "left", "left")
+def test_few_shot_prompt_differs_from_rubric_by_block_e_only():
+    s = pv.build_prompt("S_few_shot", "raw_video", IDX, "left", "left")
+    r = pv.build_prompt("R_rubric", "raw_video", IDX, "left", "left")
+    assert pv.BLOCK_E in s and pv.BLOCK_E not in r
+    assert s.replace(pv.BLOCK_E + "\n\n", "") == r
+    assert s.index(pv.BLOCK_D) < s.index(pv.BLOCK_E) < s.index(pv.BLOCK_F)
+
+
+# ---- worked examples (prompt S) ----
+def test_example_answers_parse_and_are_consistent():
+    import fewshot_examples as fe
+    for instance in fe.ANSWERS:
+        parsed, ok, err = gait_parse.parse_gait_response(fe.answer_text(instance))
+        assert ok and err is None and parsed["_checks"]["consistent"], instance
+
+
+def test_examples_cover_every_class_and_both_events_from_unused_participants():
+    import fewshot_examples as fe
+    import samples
+    assert list(fe.ANSWERS) == samples.FEWSHOT_INSTANCES
+    assert {samples.CLASS_OF[i] for i in fe.ANSWERS} == {0, 1, 2}
+    assert any(a["freeze"] for a in fe.ANSWERS.values()) and any(a["obstacle"] for a in fe.ANSWERS.values())
+    for instance, answer in fe.ANSWERS.items():
+        assert answer["gait_class"] == samples.CLASS_OF[instance]
+        assert instance // samples.INSTANCES_PER_PARTICIPANT not in set(samples.DEV_PERSONS) | set(samples.HELD_OUT_PERSONS)
+        assert instance in samples.STAGED_INSTANCES
+        assert instance not in samples.DEV_INSTANCES and instance not in samples.HELD_OUT_INSTANCES
+
+
+def test_example_items_order_and_inputs():
+    import fewshot_examples as fe
+    asked = []
+    items = fe.example_items("montage", lambda i, g: asked.append((i, g)) or f"img{i}")
+    assert [t for t, _ in items][0].startswith("WORKED EXAMPLES") and "someone else" in items[0][0]
+    assert [img for _, img in items if img is not None] == ["img975", "img1712", "img343"]
+    assert asked == [(975, "raw_video"), (1712, "raw_video"), (343, "raw_video")]
+    assert items[2][0].startswith("Example 1, correct answer:") and items[-1][1] is None
+    fe.example_items("skeleton", lambda i, g: asked.append((i, g)))
+    assert asked[-1] == (343, "skeleton")
+
+
+def test_example_grids_rendered_for_each_input(tmp_path):
+    import build_fewshot_grids as bg
+    import samples
+    stage = bg.STAGE
+    if not (stage / "fewshot").exists():
+        pytest.skip("kaggle_upload not staged")
+    for instance in samples.FEWSHOT_INSTANCES:
+        for rep in bg.GRID_REPS:
+            assert (stage / "fewshot" / f"{instance}_{rep}.png").stat().st_size > 1000
 
 
 def test_unknown_names_raise():

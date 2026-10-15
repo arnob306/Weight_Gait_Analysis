@@ -1,2 +1,2 @@
-staged 246 files, 85.8 MB in C:\Users\arnob\Downloads\FIT2082 project\kaggle_upload
+staged 255 files, 89.2 MB in C:\Users\arnob\Downloads\FIT2082 project\kaggle_upload
 done

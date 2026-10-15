@@ -40,6 +40,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+import fewshot_examples
 import prompts_v2
 from frame_sampling import extract_frames, sample_frame_indices_fps
 from gait_parse import (leg_truth, nine_class, parse_direction_response, parse_gait_response,
@@ -153,6 +154,19 @@ def _done_keys(out_path: Path) -> set[str]:
     return keys
 
 
+def load_example_items(view: str, data_dir: Path | None = None) -> list[tuple[str, np.ndarray | None]]:
+    """The worked examples for prompt S, with the grid images read from <data>/fewshot/."""
+    folder = (data_dir or DATA_DIR) / "fewshot"
+
+    def load_grid(instance: int, grid: str) -> np.ndarray:
+        image = cv2.imread(str(folder / f"{instance}_{grid}.png"))
+        if image is None:
+            raise FileNotFoundError(f"missing example grid {folder / f'{instance}_{grid}.png'}")
+        return image
+
+    return fewshot_examples.example_items(view, load_grid)
+
+
 def v2_fields(parsed: dict | None, meta: dict | None, direction: str | None) -> dict:
     """What a v2 call records beyond the common fields: the model's per-leg and event answers
     next to the ground truth, so every claim can be scored later."""
@@ -215,7 +229,9 @@ def run(instances: list[int], reps: list[str], prompt_names: list[str], fps_valu
             view = "raw_video" if rep == "blind" else rep
             text = prompts_v2.build_prompt(prompt, view, indices or BLIND_INDICES, direction, near)
             labels = prompts_v2.frame_labels(rep, len(images)) if images else None
-            raw = generate_fn(images, text, max_new_tokens=V2_MAX_NEW_TOKENS, labels=labels)
+            examples = load_example_items(rep) if "E" in prompts_v2.VARIANTS[prompt] else None
+            raw = generate_fn(images, text, max_new_tokens=V2_MAX_NEW_TOKENS, labels=labels,
+                              examples=examples)
             parsed, ok, error = parse_gait_response(raw)
             pred = parsed["gait_class"] if ok else None
             extra = {**v2_fields(parsed, meta, direction), "indices": indices}

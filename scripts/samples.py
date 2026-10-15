@@ -87,9 +87,12 @@ DEV_INSTANCES = [427, 442, 467, 548, 561, 582, 670, 675, 696, 703, 745, 753, 770
 HELD_OUT_INSTANCES = [16, 20, 31, 41, 189, 199, 201, 234, 243, 274, 294, 295, 366, 392, 407, 843, 876,
                       877, 893, 1094, 1104, 1124, 1278, 1296, 1302, 1317, 1384, 1409, 1436, 1500, 1513,
                       1527, 1545, 1873, 1884, 1902]
+# Worked examples for the few-shot prompt: clips of participants 16, 28 and 5, who are in neither set.
+# Classes 0 (with an obstacle), 1 (with a freeze) and 2. Observations: fewshot_examples.py.
+FEWSHOT_INSTANCES = [975, 1712, 343]
 # Every clip any experiment has used or will use, so one staging covers pilot results and new runs.
 STAGED_INSTANCES = sorted(set(PILOT_DEV_INSTANCES) | set(PILOT_HELD_OUT_INSTANCES)
-                          | set(DEV_INSTANCES) | set(HELD_OUT_INSTANCES))
+                          | set(DEV_INSTANCES) | set(HELD_OUT_INSTANCES) | set(FEWSHOT_INSTANCES))
 
 
 def class_of(instance: int) -> int:
