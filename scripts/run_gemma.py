@@ -198,7 +198,10 @@ def _v2_clip(instance: int, rep: str, fps: float, mode: str, clip_meta: dict, wi
 
 
 def run(instances: list[int], reps: list[str], prompt_names: list[str], fps_values: list[float],
-        mode: str = "window", split: str = "dev", out_path: Path = OUT_PATH) -> None:
+        mode: str = "window", split: str = "dev", out_path: Path = OUT_PATH,
+        temperature: float | None = None, seed: int | None = None) -> None:
+    """temperature/seed: sampled decoding for the confidence-agreement runs. Give each repeat its
+    own split name (e.g. "sampled_1") so its calls are kept apart from the greedy ones."""
     from gemma_backend import generate_fn  # needs torch and a GPU; imported here so this module loads without them
 
     windows = json.loads((DATA_DIR / "windows.json").read_text())
@@ -231,7 +234,7 @@ def run(instances: list[int], reps: list[str], prompt_names: list[str], fps_valu
             labels = prompts_v2.frame_labels(rep, len(images)) if images else None
             examples = load_example_items(rep) if "E" in prompts_v2.VARIANTS[prompt] else None
             raw = generate_fn(images, text, max_new_tokens=V2_MAX_NEW_TOKENS, labels=labels,
-                              examples=examples)
+                              examples=examples, temperature=temperature, seed=seed)
             parsed, ok, error = parse_gait_response(raw)
             pred = parsed["gait_class"] if ok else None
             extra = {**v2_fields(parsed, meta, direction), "indices": indices}
@@ -244,7 +247,7 @@ def run(instances: list[int], reps: list[str], prompt_names: list[str], fps_valu
         record = {
             "split": split, "prompt": prompt, "fps": fps, "mode": mode, "rep": rep,
             "instance": instance, "true_class": true_class, "n_images": len(images),
-            "pred": pred, "success": ok, "error": error,
+            "pred": pred, "success": ok, "error": error, "temperature": temperature, "seed": seed,
             "parsed": parsed, "raw": raw, **extra,
         }
         with out_path.open("a") as fh:

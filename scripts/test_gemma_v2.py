@@ -417,3 +417,42 @@ def test_default_drawing_is_unchanged():
     joints, valid = _joints()
     out = su.draw_skeleton(np.zeros((200, 200, 3), np.uint8), joints, valid)
     assert tuple(out[120, 50]) == (255, 255, 255) and tuple(out[120, 80]) == (255, 255, 255)
+
+
+# ---- runner with a stub model ----
+def _stub_run(monkeypatch, tmp_path, **kwargs):
+    import sys
+    import types
+
+    import fewshot_examples as fe
+    import run_gemma
+    stage = run_gemma.Path(__file__).resolve().parent.parent / "kaggle_upload"
+    if not (stage / "clip_meta.json").exists():
+        pytest.skip("kaggle_upload not staged")
+    calls = []
+
+    def fake(images, prompt, max_new_tokens=0, labels=None, examples=None, temperature=None, seed=None):
+        calls.append({"images": len(images), "examples": len(examples or []),
+                      "temperature": temperature, "seed": seed})
+        return fe.answer_text(975)
+
+    monkeypatch.setitem(sys.modules, "gemma_backend", types.SimpleNamespace(generate_fn=fake))
+    monkeypatch.setattr(run_gemma, "DATA_DIR", stage)
+    out = tmp_path / "out.jsonl"
+    run_gemma.run([670], ["raw_video", "blind"], kwargs.pop("prompts"), [1], out_path=out, **kwargs)
+    return calls, [json.loads(line) for line in out.read_text().splitlines()]
+
+
+def test_few_shot_runner_sends_examples_only_for_s(monkeypatch, tmp_path):
+    calls, rows = _stub_run(monkeypatch, tmp_path, prompts=["S_few_shot", "R_rubric"])
+    assert [c["examples"] for c in calls] == [8, 8, 0, 0]
+    assert [c["images"] for c in calls] == [7, 0, 7, 0] and all(r["success"] for r in rows)
+
+
+def test_sampling_options_reach_the_model_and_the_record(monkeypatch, tmp_path):
+    calls, rows = _stub_run(monkeypatch, tmp_path, prompts=["R_rubric"], split="sampled_1",
+                            temperature=0.7, seed=28)
+    assert {(c["temperature"], c["seed"]) for c in calls} == {(0.7, 28)}
+    assert {(r["split"], r["temperature"], r["seed"]) for r in rows} == {("sampled_1", 0.7, 28)}
+    calls, rows = _stub_run(monkeypatch, tmp_path, prompts=["R_rubric"])
+    assert {(c["temperature"], c["seed"]) for c in calls} == {(None, None)}

@@ -81,7 +81,7 @@ GRID_FILES = {"raw_video": "raw_video", "montage": "raw_video", "skeleton": "ske
 
 
 def answer_text(instance: int) -> str:
-    return json.dumps(ANSWERS[instance], indent=2)
+    return json.dumps(ANSWERS[instance], separators=(",", ":"))  # compact: saves tokens, and memory on the T4
 
 
 def example_items(view: str, load_grid: Callable[[int, str], object]) -> list[tuple[str, object]]:

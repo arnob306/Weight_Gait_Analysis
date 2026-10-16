@@ -90,24 +90,26 @@ def count_input_tokens(frames, prompt: str, labels=None, examples=None) -> int:
     return int(_build_inputs(frames, prompt, labels, examples)["input_ids"].shape[-1])
 
 
-def generate_fn(frames, prompt: str, max_new_tokens: int = 512, labels=None, examples=None) -> str:
+def generate_fn(frames, prompt: str, max_new_tokens: int = 512, labels=None, examples=None,
+                temperature: float | None = None, seed: int | None = None) -> str:
     """frames: list of BGR numpy arrays, as returned by frame_sampling.extract_frames.
     An empty list gives the text-only blind control. labels: optional text line before
-    each image. examples: worked examples, see _build_inputs."""
+    each image. examples: worked examples, see _build_inputs. temperature: None keeps the
+    greedy default; a number samples at that temperature (top_p 0.95, top_k 64, the model card's
+    values) after seeding with seed, for the confidence-agreement runs."""
     model, processor = _load()
     inputs = _build_inputs(frames, prompt, labels, examples)
     input_len = inputs["input_ids"].shape[-1]
 
+    sampling = ({"do_sample": True, "temperature": temperature, "top_p": 0.95, "top_k": 64}
+                if temperature is not None else
+                {"do_sample": False, "temperature": None,  # clear the sampling defaults in the model's generation config
+                 "top_p": None, "top_k": None})
+    if seed is not None:
+        torch.manual_seed(seed)
     try:
         with torch.no_grad():
-            output_ids = model.generate(
-                **inputs,
-                max_new_tokens=max_new_tokens,
-                do_sample=False,
-                temperature=None,  # clear the sampling defaults in the model's generation config
-                top_p=None,
-                top_k=None,
-            )
+            output_ids = model.generate(**inputs, max_new_tokens=max_new_tokens, **sampling)
         return processor.decode(output_ids[0][input_len:], skip_special_tokens=True)
     finally:
         torch.cuda.empty_cache()  # return the vision encoder's temporary memory between calls
