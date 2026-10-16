@@ -7,8 +7,9 @@ clips (results/measured_dev36.csv, from branch_d_measured_dev.py), and reports f
   - per attribute: Spearman rank correlation with the measured value, over the clips where the
     rating is 0, 1 or 2 and the measured value exists, only when the ratings take at least two
     values and there are at least MIN_PAIRS clips
-  - a classifier on the ratings alone (leave-one-clip-out logistic regression, three classes)
-    against the 12-of-36 always-class-0 baseline
+  - a classifier on the ratings alone (leave-one-participant-out logistic regression, three
+    classes: all clips of a participant are held out together) against the 12-of-36 always-class-0
+    baseline
 
 Run from scripts/:  python branch_d_gemma_analysis.py ../results/branch_d_gemma.jsonl
 """
@@ -22,6 +23,7 @@ from scipy.stats import spearmanr
 from sklearn.linear_model import LogisticRegression
 
 from branch_d_elicit import ATTRIBUTE_GROUPS
+from samples import INSTANCES_PER_PARTICIPANT
 
 ATTRIBUTES = [key for group in ATTRIBUTE_GROUPS.values() for key, _, _ in group]
 MEASURED_PATH = Path(__file__).resolve().parent.parent / "results" / "measured_dev36.csv"
@@ -59,16 +61,18 @@ def attribute_table(ratings: pd.DataFrame, measured: pd.DataFrame) -> pd.DataFra
 
 
 def classify_from_ratings(ratings: pd.DataFrame) -> dict:
-    """Leave-one-clip-out logistic regression on the ratings (missing = 1, 'typical')."""
+    """Leave-one-participant-out logistic regression on the ratings (missing = 1, 'typical').
+    A participant's clips never sit on both sides of the split."""
     x = ratings[ATTRIBUTES].fillna(1).to_numpy(dtype=float)
     y = ratings["weight_class"].to_numpy()
+    groups = ratings["instance"].to_numpy() // INSTANCES_PER_PARTICIPANT
     if np.ptp(x, axis=0).sum() == 0:  # every rating identical: nothing to fit
         return {"correct": int((y == np.bincount(y).argmax()).sum()), "n": len(y), "informative": False}
     correct = 0
-    for i in range(len(y)):
-        keep = np.arange(len(y)) != i
-        model = LogisticRegression(max_iter=1000).fit(x[keep], y[keep])
-        correct += int(model.predict(x[i:i + 1])[0] == y[i])
+    for person in np.unique(groups):
+        test = groups == person
+        model = LogisticRegression(max_iter=1000).fit(x[~test], y[~test])
+        correct += int((model.predict(x[test]) == y[test]).sum())
     return {"correct": correct, "n": len(y), "informative": True}
 
 
