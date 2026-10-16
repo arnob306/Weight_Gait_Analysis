@@ -456,3 +456,88 @@ def test_sampling_options_reach_the_model_and_the_record(monkeypatch, tmp_path):
     assert {(r["split"], r["temperature"], r["seed"]) for r in rows} == {("sampled_1", 0.7, 28)}
     calls, rows = _stub_run(monkeypatch, tmp_path, prompts=["R_rubric"])
     assert {(c["temperature"], c["seed"]) for c in calls} == {(None, None)}
+
+
+# ---- Branch D with Gemma ----
+def test_branch_d_prompt_differs_by_input_opening_only():
+    import branch_d_elicit as be
+    import branch_d_gemma as bd
+    keys = [k for group in be.ATTRIBUTE_GROUPS.values() for k, _, _ in group]
+    assert len(keys) == 27
+    for group in be.ATTRIBUTE_GROUPS:
+        skel, raw = bd.build_prompt("skeleton", group, 5), bd.build_prompt("raw_video", group, 5)
+        tail = skel[skel.index(bd.HEADER_SPLIT):]
+        assert raw.endswith(tail) and "stick figure" in skel and "stick figure" not in raw
+        assert "classify the gait" in tail and "null" in tail and "5 frames" in raw
+    assert all(k in "".join(bd.build_prompt("raw_video", g, 5) for g in be.ATTRIBUTE_GROUPS) for k in keys)
+
+
+def test_branch_d_run_records_three_groups_per_clip_and_resumes(monkeypatch, tmp_path):
+    import sys
+    import types
+
+    import branch_d_gemma as bd
+    import run_gemma
+    stage = run_gemma.Path(__file__).resolve().parent.parent / "kaggle_upload"
+    if not (stage / "clip_meta.json").exists():
+        pytest.skip("kaggle_upload not staged")
+    seen = []
+
+    def fake(images, prompt, max_new_tokens=0, labels=None, **_):
+        seen.append(len(images))
+        return '{"step_length": 1}'
+
+    monkeypatch.setitem(sys.modules, "gemma_backend", types.SimpleNamespace(generate_fn=fake))
+    monkeypatch.setattr(run_gemma, "DATA_DIR", stage)
+    out = tmp_path / "d.jsonl"
+    bd.run([670], ["skeleton"], out_path=out)
+    rows = [json.loads(line) for line in out.read_text().splitlines()]
+    assert [r["group"] for r in rows] == ["legs", "foot_temporal", "upper_body"] and len(seen) == 3
+    assert rows[0]["ratings"]["step_length"] == 1 and rows[0]["status"]["step_length"] == "rated"
+    assert rows[0]["status"]["knee_flexion_rom_left"] == "invalid"  # absent from the answer
+    bd.run([670], ["skeleton"], out_path=out)
+    assert len(seen) == 3
+
+
+def _fake_ratings_file(tmp_path, rating_of):
+    import branch_d_elicit as be
+    import samples
+    lines = []
+    for instance in samples.DEV_INSTANCES:
+        for group, attrs in be.ATTRIBUTE_GROUPS.items():
+            ratings = {k: rating_of(instance, k) for k, _, _ in attrs}
+            status = {k: "rated" if v is not None else "null" for k, v in ratings.items()}
+            lines.append(json.dumps({"rep": "skeleton", "group": group, "instance": instance,
+                                     "weight_class": samples.CLASS_OF[instance],
+                                     "ratings": ratings, "status": status}))
+    path = tmp_path / "ratings.jsonl"
+    path.write_text("\n".join(lines))
+    return path
+
+
+def test_branch_d_analysis_flat_ratings_are_not_computable(tmp_path):
+    import pandas as pd
+
+    import branch_d_gemma_analysis as an
+    ratings = an.load_ratings(_fake_ratings_file(tmp_path, lambda i, k: 1))
+    table = an.attribute_table(ratings, pd.read_csv(an.MEASURED_PATH))
+    assert table["spearman"].isna().all() and (table["distinct"] == 1).all()
+    assert an.classify_from_ratings(ratings)["informative"] is False
+
+
+def test_branch_d_analysis_finds_a_planted_correlation(tmp_path):
+    import pandas as pd
+
+    import branch_d_gemma_analysis as an
+    measured = pd.read_csv(an.MEASURED_PATH).set_index("instance")
+    cut = measured["step_length"].quantile([1 / 3, 2 / 3]).tolist()
+
+    def rating(instance, key):
+        if key != "step_length":
+            return None
+        return int(measured.loc[instance, key] > cut[0]) + int(measured.loc[instance, key] > cut[1])
+
+    table = an.attribute_table(an.load_ratings(_fake_ratings_file(tmp_path, rating)), measured.reset_index())
+    row = table.set_index("attribute").loc["step_length"]
+    assert row["spearman"] > 0.9 and row["rated"] == 36
+    assert table.set_index("attribute").loc["step_width", "null"] == 36
