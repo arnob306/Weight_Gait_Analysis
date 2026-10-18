@@ -1,0 +1,4 @@
+prompt,n,correct,p_vs_third,nine_class_correct,pred_0,pred_1,pred_2,hit_0,hit_1,hit_2
+Z_zero_shot,36,12,0.5623720366911407,6,36,0,0,12,0,0
+R_rubric,36,12,0.5623720366911407,6,20,0,16,7,0,5
+S_few_shot,36,16,0.1094342108568222,7,30,0,6,12,0,4

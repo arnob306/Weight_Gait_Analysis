@@ -1,0 +1,4 @@
+a,b,only_a,only_b,p
+Z_zero_shot,R_rubric,5,5,1.0
+Z_zero_shot,S_few_shot,0,4,0.125
+R_rubric,S_few_shot,2,6,0.2890625
