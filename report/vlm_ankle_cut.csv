@@ -1,0 +1,7 @@
+input,true_class,0,2,n_clips
+raw_ankle_cut,0.0,8,0,26
+raw_ankle_cut,1.0,8,0,26
+raw_ankle_cut,2.0,10,0,26
+raw_video,0.0,8,0,26
+raw_video,1.0,8,0,26
+raw_video,2.0,6,4,26

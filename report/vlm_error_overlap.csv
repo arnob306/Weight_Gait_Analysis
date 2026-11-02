@@ -1,0 +1,8 @@
+a,b,jaccard,wrong_a,wrong_b,both_wrong
+raw_video,skeleton,0.72,19.0,24.0,18
+raw_video,overlay,0.8181818181818182,19.0,21.0,18
+raw_video,montage,0.7619047619047619,19.0,18.0,16
+skeleton,overlay,0.7307692307692307,24.0,21.0,19
+skeleton,montage,0.5555555555555556,24.0,18.0,15
+overlay,montage,0.6956521739130435,21.0,18.0,16
+all four,,,,,14

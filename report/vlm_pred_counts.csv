@@ -1,0 +1,13 @@
+prompt,rep,0,1,2
+R_rubric,montage,20,0,16
+R_rubric,overlay,29,1,6
+R_rubric,raw_video,30,0,6
+R_rubric,skeleton,34,2,0
+S_few_shot,montage,28,0,8
+S_few_shot,overlay,33,0,3
+S_few_shot,raw_video,35,0,1
+S_few_shot,skeleton,25,0,11
+Z_zero_shot,montage,36,0,0
+Z_zero_shot,overlay,36,0,0
+Z_zero_shot,raw_video,35,1,0
+Z_zero_shot,skeleton,36,0,0

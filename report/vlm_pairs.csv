@@ -1,0 +1,5 @@
+topic,clips,condition_present,both_right,same_answer_to_both,no_to_both,false_yes,hallucination_rate
+freeze,36,9,27,0,0,9,0.25
+obstacle,36,9,28,0,0,8,0.2222222222222222
+left_leg,36,24,1,35,35,0,0.9722222222222222
+right_leg,36,12,0,36,36,0,1.0

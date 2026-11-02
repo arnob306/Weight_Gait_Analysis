@@ -1,0 +1,10 @@
+rep,true_class,clips,any_flagged,legs_right
+overlay,0,14,0,14
+overlay,1,14,0,0
+overlay,2,12,1,1
+raw_ankle_cut,0,14,1,13
+raw_ankle_cut,1,14,0,0
+raw_ankle_cut,2,12,0,0
+raw_video,0,14,1,13
+raw_video,1,14,14,0
+raw_video,2,12,12,12
